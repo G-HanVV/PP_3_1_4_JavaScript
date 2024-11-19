@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Admin</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container">
+    <h1>Admin Dashboard</h1>
+    <table id="users-table" class="table">
+        <thead>
+        <!-- Заголовки будут добавлены сюда -->
+        </thead>
+        <tbody>
+        <!-- Строки будут добавлены сюда -->
+        </tbody>
+    </table>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        fetch('/api/users')
+            .then(response => response.json())
+            .then(users => {
+                if (users.length > 0) {
+                    const table = document.querySelector('#users-table');
+                    const thead = table.querySelector('thead');
+                    const tbody = table.querySelector('tbody');
+
+                    // 1. Формируем заголовки таблицы из ключей первого объекта
+                    const headers = Object.keys(users[0]); // Извлекаем ключи первого объекта
+                    const headerRow = headers.map(key => `<th>${key.toUpperCase()}</th>`).join('');
+                    thead.innerHTML = `<tr>${headerRow}</tr>`;
+
+                    // 2. Добавляем строки таблицы
+                    users.forEach(user => {
+                        console.log(user);
+                        const row = headers.map(key => {
+                            // Если поле — массив, например "roles", преобразуем в строку
+                            const value = Array.isArray(user[key])
+                                ? user[key].map(item => item.authority).join(', ')
+                                : user[key];
+                            return `<td>${value}</td>`;
+                        }).join('');
+                        tbody.innerHTML += `<tr>${row}</tr>`;
+                    });
+                } else {
+                    console.warn('No users found');
+                }
+            })
+            .catch(error => console.error('Error fetching users:', error));
+    });
+</script>
+
+<!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>-->
+</body>
+</html>

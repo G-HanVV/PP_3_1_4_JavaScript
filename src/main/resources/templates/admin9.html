@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Management</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-4">
+  <h1 class="text-center">User Management</h1>
+  <!-- Вкладки -->
+  <ul class="nav nav-tabs" id="myTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab" aria-controls="users" aria-selected="true">
+        Users
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="create-user-tab" data-bs-toggle="tab" data-bs-target="#create-user" type="button" role="tab" aria-controls="create-user" aria-selected="false">
+        Create User
+      </button>
+    </li>
+  </ul>
+  <div class="tab-content mt-3" id="myTabContent">
+    <!-- Вкладка с таблицей пользователей -->
+    <div class="tab-pane fade show active" id="users" role="tabpanel" aria-labelledby="users-tab">
+      <h3>User List</h3>
+      <table class="table table-bordered table-striped">
+        <thead id="userTableHead"></thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+    </div>
+    <!-- Вкладка с формой создания пользователя -->
+    <div class="tab-pane fade" id="create-user" role="tabpanel" aria-labelledby="create-user-tab">
+      <h3>Create New User</h3>
+      <form id="userForm"></form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const API_URL = '/api/users';
+  const ROLES_API_URL = '/api/users/roles';
+
+  // Функция для динамического построения таблицы
+  async function buildDynamicTable(users) {
+    if (users.length === 0) return;
+
+    const tableHead = document.getElementById('userTableHead');
+    const firstUser = users[0]; // Берем первого пользователя для извлечения структуры
+    const keys = Object.keys(firstUser);
+
+    // Заголовки таблицы
+    tableHead.innerHTML = '<tr>' + keys.map(key => `<th>${key}</th>`).join('') + '</tr>';
+
+    const tableBody = document.getElementById('userTableBody');
+    tableBody.innerHTML = ''; // Очищаем таблицу
+
+    users.forEach(user => {
+      const row = document.createElement('tr');
+      keys.forEach(key => {
+        if (Array.isArray(user[key])) {
+          // Если поле - это массив (например, roles), показываем только authority
+          if (key === 'roles') {
+            row.innerHTML += `<td>${user[key].map(role => role.authority).join(', ')}</td>`;
+          } else {
+            row.innerHTML += `<td>${user[key]}</td>`;
+          }
+        } else {
+          row.innerHTML += `<td>${user[key]}</td>`;
+        }
+      });
+      tableBody.appendChild(row);
+    });
+  }
+
+  // Функция для создания динамической формы
+  async function buildDynamicForm(userFields, roles) {
+    const form = document.getElementById('userForm');
+
+    // Строим поля формы на основе заголовков пользователя
+    form.innerHTML = userFields.map(field => {
+      if (field === 'id') {
+        // Игнорируем поле id, оно не должно отображаться в форме
+        return '';
+      }
+
+      if (field === 'roles') {
+        // Если поле - это роли, создаем выпадающий список для выбора
+        return `
+                    <div class="mb-3">
+                        <label class="form-label" for="roles">Roles</label>
+                        <select class="form-select" id="roles" name="roles" multiple>
+                            ${roles.map(role => `
+                                <option value="${role.id}">${role.authority}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                `;
+      } else {
+        // Для других полей создаем обычные текстовые поля
+        return `
+                    <div class="mb-3">
+                        <label for="${field}" class="form-label">${field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                        <input type="text" id="${field}" name="${field}" class="form-control" required>
+                    </div>
+                `;
+      }
+    }).join('') + `
+            <button type="submit" class="btn btn-primary">Create User</button>
+        `;
+
+    // Обработчик отправки формы
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = {};
+
+      // Собираем значения из полей формы
+      userFields.forEach(field => {
+        if (field === 'roles') {
+          const selectedRoles = [];
+          const rolesSelect = document.getElementById('roles');
+          const selectedOptionIds = Array.from(rolesSelect.selectedOptions).map(option => option.value);
+          selectedRoles.push(...roles.filter(role => selectedOptionIds.includes(role.id.toString())));
+          user.roles = selectedRoles;
+        } else if (field !== 'id') {
+          user[field] = document.getElementById(field).value;
+        }
+      });
+
+      await addUser(user);
+      loadUsers(); // Перезагружаем пользователей
+      form.reset(); // Сбрасываем форму
+    });
+  }
+
+  // Функция для получения списка пользователей
+  async function loadUsers() {
+    const response = await fetch(API_URL);
+    const users = await response.json();
+    await buildDynamicTable(users); // Строим таблицу
+
+    // Загружаем список ролей для формы создания нового пользователя
+    const rolesResponse = await fetch(ROLES_API_URL);
+    const roles = await rolesResponse.json();
+
+    if (users.length > 0) {
+      const userFields = Object.keys(users[0]); // Получаем заголовки из первого пользователя
+      await buildDynamicForm(userFields, roles); // Строим форму для нового пользователя
+    }
+  }
+
+  // Функция для добавления нового пользователя
+  async function addUser(user) {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+  }
+
+  // Инициализация страницы
+  loadUsers(); // Загружаем пользователей и формируем таблицу и форму
+</script>
+</body>
+</html>

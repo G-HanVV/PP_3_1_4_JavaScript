@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Management</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-4">
+  <h1 class="text-center">User Management</h1>
+  <!-- Вкладки -->
+  <ul class="nav nav-tabs" id="myTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab" aria-controls="users" aria-selected="true">
+        Users
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="create-user-tab" data-bs-toggle="tab" data-bs-target="#create-user" type="button" role="tab" aria-controls="create-user" aria-selected="false">
+        Create User
+      </button>
+    </li>
+  </ul>
+  <div class="tab-content mt-3" id="myTabContent">
+    <!-- Вкладка с таблицей пользователей -->
+    <div class="tab-pane fade show active" id="users" role="tabpanel" aria-labelledby="users-tab">
+      <h3>User List</h3>
+      <table class="table table-bordered table-striped">
+        <thead id="userTableHead"></thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+    </div>
+    <!-- Вкладка с формой создания пользователя -->
+    <div class="tab-pane fade" id="create-user" role="tabpanel" aria-labelledby="create-user-tab">
+      <h3>Create New User</h3>
+      <form id="userForm"></form>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно для редактирования пользователя -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editUserModalLabel">Edit User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editUserForm"></form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="submit" form="editUserForm" class="btn btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const API_URL = '/api/users';
+  const ROLES_API_URL = '/api/users/roles';
+
+  // Функция для динамического построения таблицы
+  async function buildDynamicTable(users) {
+    if (users.length === 0) return;
+
+    const tableHead = document.getElementById('userTableHead');
+    const firstUser = users[0];
+    const keys = Object.keys(firstUser);
+
+    // Заголовки таблицы
+    tableHead.innerHTML = '<tr>' + keys.map(key => `<th>${key}</th>`).join('') + '<th>Actions</th></tr>';
+
+    const tableBody = document.getElementById('userTableBody');
+    tableBody.innerHTML = ''; // Очищаем таблицу
+
+    users.forEach(user => {
+      const row = document.createElement('tr');
+      keys.forEach(key => {
+        if (Array.isArray(user[key])) {
+          if (key === 'roles') {
+            row.innerHTML += `<td>${user[key].map(role => role.authority).join(', ')}</td>`;
+          } else {
+            row.innerHTML += `<td>${user[key]}</td>`;
+          }
+        } else {
+          row.innerHTML += `<td>${user[key]}</td>`;
+        }
+      });
+      // Добавляем кнопки "Edit" и "Delete"
+      row.innerHTML += `
+                <td>
+                    <button class="btn btn-warning btn-sm me-2" onclick="editUser(${user.id})">Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">Delete</button>
+                </td>
+            `;
+      tableBody.appendChild(row);
+    });
+  }
+
+  // Функция для открытия модального окна редактирования
+  async function editUser(userId) {
+    const response = await fetch(`${API_URL}/${userId}`);
+    const user = await response.json();
+
+    const rolesResponse = await fetch(ROLES_API_URL);
+    const roles = await rolesResponse.json();
+
+    const editForm = document.getElementById('editUserForm');
+    const userFields = Object.keys(user);
+
+    // Заполняем форму редактирования
+    editForm.innerHTML = userFields.map(field => {
+      if (field === 'id') {
+        return `<input type="hidden" id="edit-${field}" value="${user[field]}">`;
+      }
+
+      if (field === 'roles') {
+        return `
+                    <div class="mb-3">
+                        <label class="form-label" for="edit-roles">Roles</label>
+                        <select class="form-select" id="edit-roles" name="roles" multiple>
+                            ${roles.map(role => `
+                                <option value="${role.id}" ${user.roles.some(r => r.id === role.id) ? 'selected' : ''}>${role.authority}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                `;
+      } else {
+        return `
+                    <div class="mb-3">
+                        <label class="form-label" for="edit-${field}">${field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                        <input type="text" id="edit-${field}" name="${field}" value="${user[field]}" class="form-control">
+                    </div>
+                `;
+      }
+    }).join('');
+
+    // Показываем модальное окно
+    const editModal = new bootstrap.Modal(document.getElementById('editUserModal'));
+    editModal.show();
+
+    // Обработчик сохранения изменений
+    editForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const updatedUser = {};
+      userFields.forEach(field => {
+        if (field === 'roles') {
+          const selectedRoles = Array.from(document.getElementById('edit-roles').selectedOptions).map(option => roles.find(role => role.id === parseInt(option.value)));
+          updatedUser.roles = selectedRoles;
+        } else {
+          updatedUser[field] = document.getElementById(`edit-${field}`).value;
+        }
+      });
+
+      await fetch(`${API_URL}/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedUser)
+      });
+
+      loadUsers();
+      editModal.hide();
+    };
+  }
+
+  // Функция для удаления пользователя
+  async function deleteUser(userId) {
+    if (confirm('Are you sure you want to delete this user?')) {
+      await fetch(`${API_URL}/${userId}`, { method: 'DELETE' });
+      loadUsers();
+    }
+  }
+
+  // Функция для загрузки пользователей
+  async function loadUsers() {
+    const response = await fetch(API_URL);
+    const users = await response.json();
+    buildDynamicTable(users);
+  }
+
+  // Инициализация страницы
+  loadUsers();
+</script>
+</body>
+</html>
