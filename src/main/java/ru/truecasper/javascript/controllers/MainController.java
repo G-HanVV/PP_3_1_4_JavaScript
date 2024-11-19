@@ -22,7 +22,7 @@ public class MainController {
         System.out.println(" --- MainController.adminPage");
         User user = userService.getUser(principal.getName());
         model.addAttribute("user", user);
-        return "admin13";
+        return "admin14";
     }
 
     @GetMapping("/user")
