@@ -10,7 +10,6 @@ import ru.truecasper.javascript.services.RoleService;
 import ru.truecasper.javascript.services.UserService;
 
 import java.util.List;
-import java.util.function.Function;
 
 @RestController
 @RequestMapping("/api/users")
@@ -29,14 +28,12 @@ public class UserRestController {
         return userService.getUsers().stream().map(UserDTO::new).toList();
     }
 
-    // Создание нового пользователя
     @PostMapping
     public ResponseEntity<UserDTO> createUser(@RequestBody /**@Valid*/ User user) {
         userService.addUser(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(user));
     }
 
-    // Обновление пользователя
     @PutMapping("/{id}")
     public ResponseEntity<UserDTO> updateUser(@PathVariable int id, @RequestBody /**@Valid*/ User user) {
         System.out.println(user);
@@ -45,13 +42,11 @@ public class UserRestController {
         return ResponseEntity.ok(new UserDTO(user));
     }
 
-    // Получение пользователя по ID
     @GetMapping("/{id}")
     public ResponseEntity<UserDTO> getUserById(@PathVariable int id) {
         return ResponseEntity.ok(new UserDTO(userService.getUser(id)));
     }
 
-    // Удаление пользователя
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable int id) {
         userService.deleteUser(id);

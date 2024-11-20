@@ -3,7 +3,6 @@ package ru.truecasper.javascript.controllers;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
-import ru.truecasper.javascript.models.User;
 import ru.truecasper.javascript.services.UserService;
 
 import java.security.Principal;
@@ -19,17 +18,13 @@ public class MainController {
 
     @GetMapping("/admin")
     public String adminPage(ModelMap model, Principal principal) {
-        System.out.println(" --- MainController.adminPage");
-        User user = userService.getUser(principal.getName());
-        model.addAttribute("user", user);
-        return "admin13";
+        model.addAttribute("user", userService.getUser(principal.getName()));
+        return "admin";
     }
 
     @GetMapping("/user")
     public String userPage(ModelMap model, Principal principal) {
-        System.out.println(" --- MainController.userPage");
-        User user = userService.getUser(principal.getName());
-        model.addAttribute("user", user);
+        model.addAttribute("user", userService.getUser(principal.getName()));
         return "user";
     }
 }
